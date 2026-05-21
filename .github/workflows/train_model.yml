@@ -3,38 +3,38 @@ name: Daily Model Training
 on:
   schedule:
     - cron: '0 0 * * *'
-
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   train-model:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-    - name: Train model
-      run: |
-        python pipeline/train.py
+      - name: Train model
+        run: python pipeline/train.py
 
-    - name: Commit updated model
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "actions@github.com"
+      - name: Commit updated model
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
 
-        git add models/aqi_model.pkl
-        git add models/label_encoder.pkl
+          git add models/aqi_model.pkl
+          git add models/label_encoder.pkl
 
-        git commit -m "Automated model retraining" || echo "No changes to commit"
+          git commit -m "Automated model retraining" || echo "No changes to commit"
 
-        git push
+          git push
