@@ -1,5 +1,6 @@
 name: Hourly AQI Data Pipeline
-
+permissions:
+  contents: write
 on:
   schedule:
     - cron: '0 * * * *'
