@@ -3,6 +3,7 @@ name: Train AQI Model
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
