@@ -71,6 +71,14 @@ HOPSWORKS_PROJECT = os.getenv("HOPSWORKS_PROJECT")
 
 print("\nConnecting to Hopsworks...")
 
+HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
+HOPSWORKS_PROJECT = os.getenv("HOPSWORKS_PROJECT")
+
+if not HOPSWORKS_API_KEY:
+    raise ValueError("HOPSWORKS_API_KEY environment variable is not set!")
+if not HOPSWORKS_PROJECT:
+    raise ValueError("HOPSWORKS_PROJECT environment variable is not set!")
+
 project = hopsworks.login(
     api_key_value=HOPSWORKS_API_KEY,
     project=HOPSWORKS_PROJECT,
