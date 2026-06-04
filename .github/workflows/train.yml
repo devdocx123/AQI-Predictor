@@ -3,7 +3,7 @@ name: Train Model from Hopsworks Features
 on:
   schedule:
     - cron: "0 2 * * 0"   # every Sunday at 2am UTC
-  workflow_dispatch:        # manual trigger
+  workflow_dispatch:
 
 jobs:
   train:
@@ -25,19 +25,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Debug secrets
+      - name: Train model from Hopsworks Feature Store (with retry)
         env:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
           HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
         run: |
-          echo "API KEY SET: ${{ secrets.HOPSWORKS_API_KEY != '' }}"
-          echo "PROJECT SET: ${{ secrets.HOPSWORKS_PROJECT != '' }}"
-
-      - name: Train model from Hopsworks Feature Store
-        env:
-          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
-        run: python pipeline/train.py
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            python pipeline/train.py && break
+            echo "Attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
 
       - name: Commit updated models
         run: |
