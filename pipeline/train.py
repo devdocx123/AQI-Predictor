@@ -1,63 +1,113 @@
-import pandas as pd
+import os
 import joblib
+import pandas as pd
+from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
-# -----------------------
-# 1. LOAD DATA
-# -----------------------
-import os
-
-
-os.makedirs("../models", exist_ok=True)
-
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "data", "dataset", "pakistan_air_quality_final_clean.csv")
-
-df = pd.read_csv(DATA_PATH)
+load_dotenv()
 
 # -----------------------
-# 2. SELECT FEATURES
+# 1. CONNECT TO HOPSWORKS
 # -----------------------
+import hopsworks
+
+print("Connecting to Hopsworks...")
+
+project = hopsworks.login(
+    api_key_value=os.getenv("HOPSWORKS_API_KEY"),
+    project=os.getenv("HOPSWORKS_PROJECT"),
+)
+
+fs = project.get_feature_store()
+print("Connected!")
+
+# -----------------------
+# 2. READ LIVE FEATURES FROM FEATURE STORE
+# -----------------------
+print("Reading features from Hopsworks Feature Store...")
+
+fg = fs.get_feature_group(name="aqi_features", version=1)
+df_live = fg.read()
+
+print(f"Loaded {len(df_live)} rows from Feature Store")
+print(df_live.head())
+
+# -----------------------
+# 3. LOAD STATIC DATASET FOR CLASSIFICATION TRAINING
+#    Live AQI data has no labels; use Pakistan historical dataset
+# -----------------------
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_PATH = os.path.join(BASE_DIR, "data", "dataset", "pakistan_air_quality_final_clean.csv")
+
+df_static = pd.read_csv(STATIC_PATH)
+
 features = [
     "pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide",
     "sulphur_dioxide", "ozone", "temperature",
     "humidity", "pressure", "wind_speed"
 ]
 
-df = df[features + ["aqi_category"]].dropna()
+df_static = df_static[features + ["aqi_category"]].dropna()
+print(f"Static dataset: {len(df_static)} rows")
 
 # -----------------------
-# 3. ENCODE TARGET
+# 4. ENCODE TARGET
 # -----------------------
 le = LabelEncoder()
-df["aqi_category"] = le.fit_transform(df["aqi_category"])
+df_static["aqi_category"] = le.fit_transform(df_static["aqi_category"])
 
-X = df[features]
-y = df["aqi_category"]
+X = df_static[features]
+y = df_static["aqi_category"]
 
 # -----------------------
-# 4. SPLIT DATA
+# 5. SPLIT DATA
 # -----------------------
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
 # -----------------------
-# 5. TRAIN MODEL
+# 6. TRAIN MODEL
 # -----------------------
-model = RandomForestClassifier(
-    n_estimators=100,
-    random_state=42
-)
+print("Training model...")
 
+model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
-# -----------------------
-# 6. SAVE MODEL + ENCODER
-# -----------------------
-joblib.dump(model, "../models/aqi_model.pkl")
-joblib.dump(le, "../models/label_encoder.pkl")
+score = model.score(X_test, y_test)
+print(f"Test accuracy: {score:.4f}")
 
-print("Model training completed and saved!")
+# -----------------------
+# 7. SAVE MODEL + ENCODER LOCALLY
+# -----------------------
+os.makedirs(os.path.join(BASE_DIR, "models"), exist_ok=True)
+
+model_path   = os.path.join(BASE_DIR, "models", "aqi_model.pkl")
+encoder_path = os.path.join(BASE_DIR, "models", "label_encoder.pkl")
+
+joblib.dump(model, model_path)
+joblib.dump(le, encoder_path)
+
+print(f"Model saved to {model_path}")
+
+# -----------------------
+# 8. REGISTER MODEL IN HOPSWORKS MODEL REGISTRY
+# -----------------------
+print("Registering model in Hopsworks Model Registry...")
+
+mr = project.get_model_registry()
+
+hw_model = mr.sklearn.create_model(
+    name="aqi_classifier",
+    version=1,
+    metrics={"accuracy": round(score, 4)},
+    description="RandomForest AQI classifier trained on Pakistan air quality data",
+    input_example=X_test.iloc[0].to_dict(),
+)
+
+hw_model.save(os.path.join(BASE_DIR, "models"))
+
+print(f"Model registered in Hopsworks! Accuracy: {score:.4f}")
+print("Done!")

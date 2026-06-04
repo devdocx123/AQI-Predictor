@@ -6,3 +6,7 @@ streamlit
 matplotlib
 shap
 joblib
+python-dotenv
+hopsworks==4.7.*
+pyarrow
+confluent-kafka
