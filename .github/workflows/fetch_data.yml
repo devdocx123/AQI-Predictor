@@ -3,14 +3,14 @@ name: Fetch AQI + Push Features to Hopsworks
 on:
   schedule:
     - cron: "0 * * * *"   # every hour
-  workflow_dispatch:        # manual trigger from GitHub UI
+  workflow_dispatch:        # manual trigger
 
 jobs:
   fetch-and-push:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write       # needed to commit raw CSV back
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -31,6 +31,14 @@ jobs:
           path: data/raw/raw_aqi_data.csv
           key: raw-aqi-data-${{ runner.os }}
           restore-keys: raw-aqi-data-
+
+      - name: Debug secrets
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
+        run: |
+          echo "API KEY SET: ${{ secrets.HOPSWORKS_API_KEY != '' }}"
+          echo "PROJECT SET: ${{ secrets.HOPSWORKS_PROJECT != '' }}"
 
       - name: Fetch AQI data
         env:

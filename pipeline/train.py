@@ -6,14 +6,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
-load_dotenv()
+# override=False ensures GitHub Actions secrets are not overwritten by .env file
+load_dotenv(override=False)
 
 # -----------------------
 # 1. CONNECT TO HOPSWORKS
 # -----------------------
 import hopsworks
-
-print("Connecting to Hopsworks...")
 
 HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
 HOPSWORKS_PROJECT = os.getenv("HOPSWORKS_PROJECT")
@@ -22,6 +21,8 @@ if not HOPSWORKS_API_KEY:
     raise ValueError("HOPSWORKS_API_KEY environment variable is not set!")
 if not HOPSWORKS_PROJECT:
     raise ValueError("HOPSWORKS_PROJECT environment variable is not set!")
+
+print("Connecting to Hopsworks...")
 
 project = hopsworks.login(
     api_key_value=HOPSWORKS_API_KEY,
@@ -44,7 +45,6 @@ print(df_live.head())
 
 # -----------------------
 # 3. LOAD STATIC DATASET FOR CLASSIFICATION TRAINING
-#    Live AQI data has no labels; use Pakistan historical dataset
 # -----------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_PATH = os.path.join(BASE_DIR, "data", "dataset", "pakistan_air_quality_final_clean.csv")

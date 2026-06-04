@@ -1,25 +1,48 @@
-name: Train AQI Model
+name: Train Model from Hopsworks Features
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 0"   # every Sunday at 2am UTC
+  workflow_dispatch:        # manual trigger
 
 jobs:
-  build:
+  train:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Train model
+      - name: Debug secrets
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
+        run: |
+          echo "API KEY SET: ${{ secrets.HOPSWORKS_API_KEY != '' }}"
+          echo "PROJECT SET: ${{ secrets.HOPSWORKS_PROJECT != '' }}"
+
+      - name: Train model from Hopsworks Feature Store
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
         run: python pipeline/train.py
+
+      - name: Commit updated models
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add models/
+          git diff --staged --quiet || git commit -m "chore: retrain model [skip ci]"
+          git push

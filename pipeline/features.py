@@ -5,12 +5,21 @@ import os
 import tempfile
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=False ensures GitHub Actions secrets are not overwritten by .env file
+load_dotenv(override=False)
 
 os.environ["TMPDIR"] = tempfile.gettempdir()
 
-print(f"PROJECT: '{os.getenv('HOPSWORKS_PROJECT')}'")
-print(f"KEY SET: {bool(os.getenv('HOPSWORKS_API_KEY'))}")
+HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
+HOPSWORKS_PROJECT = os.getenv("HOPSWORKS_PROJECT")
+
+if not HOPSWORKS_API_KEY:
+    raise ValueError("HOPSWORKS_API_KEY environment variable is not set!")
+if not HOPSWORKS_PROJECT:
+    raise ValueError("HOPSWORKS_PROJECT environment variable is not set!")
+
+print(f"PROJECT: '{HOPSWORKS_PROJECT}'")
+print(f"KEY SET: {bool(HOPSWORKS_API_KEY)}")
 
 # -----------------------------
 # 1. LOAD RAW DATA
@@ -21,22 +30,43 @@ print("Raw data loaded successfully!")
 print(df.head())
 
 # -----------------------------
-# 2-8. FEATURE ENGINEERING
+# 2. CONVERT DATETIME
 # -----------------------------
 df["datetime"] = pd.to_datetime(df["datetime"])
+
+# -----------------------------
+# 3. HANDLE MISSING VALUES
+# -----------------------------
 df = df.ffill()
 
+# -----------------------------
+# 4. CREATE TIME FEATURES
+# -----------------------------
 df["hour"]    = df["datetime"].dt.hour
 df["day"]     = df["datetime"].dt.day
 df["month"]   = df["datetime"].dt.month
 df["weekday"] = df["datetime"].dt.weekday
 
+# -----------------------------
+# 5. CREATE LAG FEATURES
+# -----------------------------
 df["aqi_lag_1"] = df["aqi"].shift(1)
 df["aqi_lag_2"] = df["aqi"].shift(2)
 df["aqi_lag_3"] = df["aqi"].shift(3)
 
+# -----------------------------
+# 6. ROLLING AVERAGE FEATURES
+# -----------------------------
 df["aqi_rolling_mean_3"] = df["aqi"].rolling(window=3).mean()
+
+# -----------------------------
+# 7. AQI CHANGE RATE
+# -----------------------------
 df["aqi_change"] = df["aqi"].diff()
+
+# -----------------------------
+# 8. REMOVE EMPTY ROWS
+# -----------------------------
 df = df.dropna()
 
 # -----------------------------
@@ -66,18 +96,7 @@ print(df.head())
 # -----------------------------
 # 10. CONNECT TO HOPSWORKS
 # -----------------------------
-HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
-HOPSWORKS_PROJECT = os.getenv("HOPSWORKS_PROJECT")
-
 print("\nConnecting to Hopsworks...")
-
-HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
-HOPSWORKS_PROJECT = os.getenv("HOPSWORKS_PROJECT")
-
-if not HOPSWORKS_API_KEY:
-    raise ValueError("HOPSWORKS_API_KEY environment variable is not set!")
-if not HOPSWORKS_PROJECT:
-    raise ValueError("HOPSWORKS_PROJECT environment variable is not set!")
 
 project = hopsworks.login(
     api_key_value=HOPSWORKS_API_KEY,
@@ -88,39 +107,25 @@ fs = project.get_feature_store()
 print("Connected to Hopsworks Feature Store!")
 
 # -----------------------------
-# 11. SAVE AS PARQUET TO HOPSWORKS FILE SYSTEM
-#     Bypasses Kafka entirely — writes directly via REST upload
+# 11. UPLOAD VIA DATASET API (no Kafka needed)
 # -----------------------------
-
-import uuid
 import io
 
-print("\nUploading features via dataset API (no Kafka)...")
-
-# Save df to parquet in memory
-parquet_buffer = io.BytesIO()
-df.to_parquet(parquet_buffer, index=False)
-parquet_buffer.seek(0)
-
-# Upload to Hopsworks project dataset
-dataset_api = project.get_dataset_api()
+print("\nUploading features via dataset API...")
 
 file_name = f"aqi_features_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.parquet"
-upload_path = f"Resources/aqi_features/{file_name}"
+tmp_path  = os.path.join(tempfile.gettempdir(), file_name)
+df.to_parquet(tmp_path, index=False)
 
-# Ensure directory exists
+dataset_api = project.get_dataset_api()
+
 try:
     dataset_api.mkdir("Resources/aqi_features")
 except Exception:
-    pass  # Directory already exists
-
-# Write parquet to temp file then upload
-tmp_path = os.path.join(tempfile.gettempdir(), file_name)
-df.to_parquet(tmp_path, index=False)
+    pass  # directory already exists
 
 dataset_api.upload(tmp_path, "Resources/aqi_features", overwrite=True)
 
 print(f"\nFeatures successfully uploaded to Hopsworks!")
 print(f"Path: Resources/aqi_features/{file_name}")
 print(f"Rows uploaded: {len(df)}")
-print(f"\nView your files at: https://eu-west.cloud.hopsworks.ai/p/33071/datasets")
