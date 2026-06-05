@@ -10,3 +10,5 @@ python-dotenv
 hopsworks==4.7.*
 pyarrow
 confluent-kafka
+streamlit==1.45.1
+protobuf==4.25.9
