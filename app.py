@@ -122,13 +122,13 @@ st.divider()
 # ── 3-DAY FORECAST ────────────────────────────────────────────────────────────
 st.header("📅 3-Day AQI Forecast")
 
-np.random.seed(42)
+
 forecast_rows = []
 base = sample[0].copy()
 
 for day in range(3):
     for hour in [6, 12, 18]:
-        noise  = np.random.normal(0, 0.08, len(base))
+        noise  = np.random.normal(0, 0.15, len(base))
         varied = np.clip(base * (1 + noise), 0, None)
         pred   = model.predict(varied.reshape(1, -1))[0]
         cat    = encoder.inverse_transform([pred])[0]
