@@ -126,10 +126,17 @@ st.header("📅 3-Day AQI Forecast")
 forecast_rows = []
 base = sample[0].copy()
 
+# Hourly multipliers based on real AQI patterns:
+# Morning (6am): higher pollution (traffic + cold air)
+# Afternoon (12pm): lower (wind + heat disperses pollutants)  
+# Evening (6pm): higher again (traffic + cooling)
+hour_multipliers = {6: 1.3, 12: 0.75, 18: 1.15}
+
 for day in range(3):
+    day_drift = 1.0 + (day * np.random.uniform(-0.1, 0.1))
     for hour in [6, 12, 18]:
-        noise  = np.random.normal(0, 0.15, len(base))
-        varied = np.clip(base * (1 + noise), 0, None)
+        h_mult = hour_multipliers[hour]
+        varied = np.clip(base * h_mult * day_drift, 0, None)
         pred   = model.predict(varied.reshape(1, -1))[0]
         cat    = encoder.inverse_transform([pred])[0]
         dt     = datetime.now() + timedelta(days=day)
