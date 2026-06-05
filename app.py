@@ -4,9 +4,8 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression 
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (
     accuracy_score, classification_report,
     mean_squared_error, mean_absolute_error, r2_score
@@ -45,6 +44,7 @@ df = pd.read_csv(STATIC_PATH, parse_dates=["timestamp"])
 df = df.sort_values("timestamp").reset_index(drop=True)
 print(f"Dataset loaded: {df.shape}")
 
+# Features — only raw pollutant/weather readings, no derived/leaky columns
 features = [
     "pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide",
     "sulphur_dioxide", "ozone", "temperature",
@@ -54,13 +54,16 @@ features = [
 df = df[["timestamp"] + features + ["aqi_category"]].dropna()
 
 # -----------------------
-# 3. TIME-BASED SPLIT (no data leakage)
+# 3. TIME-BASED TRAIN/TEST SPLIT
+#    Train on first 80% of time, test on last 20%
+#    This prevents data leakage from future → past
 # -----------------------
 split_idx = int(len(df) * 0.8)
 df_train  = df.iloc[:split_idx]
 df_test   = df.iloc[split_idx:]
 
-print(f"Train: {len(df_train)} rows | Test: {len(df_test)} rows")
+print(f"Train: {len(df_train)} rows ({df_train['timestamp'].min()} → {df_train['timestamp'].max()})")
+print(f"Test:  {len(df_test)} rows ({df_test['timestamp'].min()} → {df_test['timestamp'].max()})")
 
 # -----------------------
 # 4. ENCODE TARGET
@@ -77,19 +80,11 @@ print(f"Classes: {list(le.classes_)}")
 
 # -----------------------
 # 5. TRAIN MULTIPLE MODELS
-#    LogisticRegression uses StandardScaler pipeline for better convergence
 # -----------------------
 models = {
-    "RandomForest": RandomForestClassifier(
-        n_estimators=100, max_depth=10, random_state=42
-    ),
-    "GradientBoosting": GradientBoostingClassifier(
-        n_estimators=100, max_depth=4, random_state=42
-    ),
-    "LogisticRegression": Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf",    LogisticRegression(max_iter=5000, C=0.1, random_state=42)),
-    ]),
+    "RandomForest":      RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42),
+    "GradientBoosting":  GradientBoostingClassifier(n_estimators=100, max_depth=4, random_state=42),
+    "LogisticRegression": LogisticRegression(max_iter=1000, random_state=42),
 }
 
 results = {}
@@ -114,7 +109,9 @@ for name, model in models.items():
     print(f"  MAE      : {mae:.4f}")
     print(f"  R²       : {r2:.4f}")
     print(classification_report(
-        y_test, y_pred, target_names=le.classes_, zero_division=0
+        y_test, y_pred,
+        target_names=le.classes_,
+        zero_division=0
     ))
 
     if acc > best_score:
@@ -131,19 +128,19 @@ try:
     import shap
     import matplotlib.pyplot as plt
     print("\nComputing SHAP values...")
-    rf = models["RandomForest"]
-    explainer   = shap.TreeExplainer(rf)
+    rf_model = models["RandomForest"]
+    explainer = shap.TreeExplainer(rf_model)
     shap_values = explainer.shap_values(X_test.iloc[:200])
     shap.summary_plot(shap_values, X_test.iloc[:200], feature_names=features, show=False)
     os.makedirs(os.path.join(BASE_DIR, "models"), exist_ok=True)
     plt.savefig(os.path.join(BASE_DIR, "models", "shap_summary.png"), bbox_inches="tight")
     plt.close()
-    print("SHAP plot saved to models/shap_summary.png")
+    print("SHAP plot saved!")
 except Exception as e:
     print(f"SHAP skipped: {e}")
 
 # -----------------------
-# 7. SAVE MODEL LOCALLY
+# 7. SAVE LOCALLY
 # -----------------------
 os.makedirs(os.path.join(BASE_DIR, "models"), exist_ok=True)
 
@@ -154,13 +151,16 @@ joblib.dump(features,   os.path.join(BASE_DIR, "models", "feature_names.pkl"))
 print("Model saved locally!")
 
 # -----------------------
-# 8. REGISTER IN HOPSWORKS MODEL REGISTRY (auto-increment version)
+# 8. REGISTER IN HOPSWORKS MODEL REGISTRY
+#    Auto-increment version to avoid conflicts
 # -----------------------
 print("\nRegistering in Hopsworks Model Registry...")
 mr = project.get_model_registry()
+
 best_metrics = results[best_model_name]
 
-for version in range(2, 20):
+# Find next available version
+for version in range(1, 20):
     try:
         hw_model = mr.sklearn.create_model(
             name="aqi_classifier",
@@ -172,8 +172,10 @@ for version in range(2, 20):
                 "r2":       round(best_metrics["r2"], 4),
             },
             description=(
-                f"Best model: {best_model_name} | Time-based split | "
-                f"Trained on Pakistan AQI dataset (21840 rows)"
+                f"Best model: {best_model_name} | "
+                f"Time-based split | "
+                f"Trained on Pakistan AQI data (21840 rows) | "
+                f"Acc={best_metrics['accuracy']:.4f}"
             ),
             input_example=X_test.iloc[0].to_dict(),
         )
