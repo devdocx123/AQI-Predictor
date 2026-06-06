@@ -1,0 +1,11 @@
+requests
+pandas
+numpy
+joblib
+scikit-learn
+python-dotenv
+hopsworks==4.7.*
+pyarrow
+confluent-kafka
+shap
+matplotlib
