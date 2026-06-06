@@ -50,8 +50,4 @@ jobs:
           git add data/raw/raw_aqi_data.csv
           git diff --staged --quiet || git commit -m "chore: update raw AQI data [skip ci]"
           git pull --rebase origin main
-<<<<<<< Updated upstream
           git push
-=======
-          git push
->>>>>>> Stashed changes
