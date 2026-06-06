@@ -221,7 +221,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── LIVE METRICS (no temperature) ─────────────────────────────────────────────
+# ── LIVE METRICS  ─────────────────────────────────────────────
 c1, c2, c3, c4 = st.columns(4)
 metrics = [
     ("PM 2.5",   f"{live['pm2_5']:.1f}",   "μg/m³"),
@@ -247,7 +247,10 @@ for day in range(1, 4):   # starts from day+1 (tomorrow)
     day_label = dt.strftime("%A, %b %d")
     slots = []
     for hour in [6, 12, 18]:
-        varied = np.clip(base * HOUR_MULTIPLIERS[hour] * day_drift, 0, None)
+        varied = base.copy()
+        for idx in [0, 1, 2, 3, 4, 5]:  # pm10, pm2_5, co, no2, so2, ozone vary with time
+            varied[idx] = base[idx] * HOUR_MULTIPLIERS[hour] * day_drift
+        varied = np.clip(varied, 0, None)
         p      = model.predict(varied.reshape(1,-1))[0]
         cat    = encoder.inverse_transform([p])[0]
         slots.append({
