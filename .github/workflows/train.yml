@@ -2,13 +2,12 @@ name: Train Model from Hopsworks Features
 
 on:
   schedule:
-    - cron: "0 2 * * 0"   # every Sunday at 2am UTC
+    - cron: "0 2 * * *"
   workflow_dispatch:
 
 jobs:
   train:
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
 
@@ -22,10 +21,10 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install pipeline dependencies
+        run: pip install -r requirements-pipeline.txt
 
-      - name: Train model from Hopsworks Feature Store (with retry)
+      - name: Train model (with retry)
         env:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
           HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
