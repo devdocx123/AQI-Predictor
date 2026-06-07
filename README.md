@@ -24,7 +24,7 @@ All pipeline steps are automated via **GitHub Actions** — features update hour
 
 ## Live Dashboard
 
-[saeed-aqi-predictor.streamlit.app](https://saeed-aqi-predictor.streamlit.app)
+[saeed-aqi-predictor.streamlit.app](https://aqi-predictor-by-saeed.streamlit.app/)
 
 ## Project Structure
 
