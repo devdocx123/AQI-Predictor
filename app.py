@@ -187,7 +187,7 @@ def fetch_live():
             "ozone":           iaqi.get("o3",  {}).get("v", 60.0),
             "pressure":        iaqi.get("p",   {}).get("v", 1013.0),
             "wind_speed":      iaqi.get("w",   {}).get("v", 5.0),
-            "temperature":     25.0,  # not used in display
+            "temperature":     25.0,
         }
     except:
         return None
@@ -221,11 +221,11 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── LIVE METRICS  ─────────────────────────────────────────────
+# ── LIVE METRICS ──────────────────────────────────────────────────────────────
 c1, c2, c3, c4 = st.columns(4)
 metrics = [
-    ("PM 2.5",   f"{live['pm2_5']:.1f}",   "μg/m³"),
-    ("PM 10",    f"{live['pm10']:.1f}",    "μg/m³"),
+    ("PM 2.5",   f"{live['pm2_5']:.1f}",    "μg/m³"),
+    ("PM 10",    f"{live['pm10']:.1f}",     "μg/m³"),
     ("Humidity", f"{live['humidity']:.0f}", "%"),
     ("Wind",     f"{live['wind_speed']:.1f}", "km/h"),
 ]
@@ -236,28 +236,27 @@ for col, (label, val, unit) in zip([c1,c2,c3,c4], metrics):
         <div class="metric-label">{label} · {unit}</div>
     </div>""", unsafe_allow_html=True)
 
-# ── FORECAST (starts tomorrow) ────────────────────────────────────────────────
+# ── FORECAST ──────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-title">3-Day Forecast</div>', unsafe_allow_html=True)
 
 base = sample[0].copy()
 forecast_data = []
-for day in range(1, 4):   # starts from day+1 (tomorrow)
+for day in range(1, 4):
     day_drift = 1.0 + (day * np.random.uniform(-0.08, 0.08))
     dt = datetime.now() + timedelta(days=day)
     day_label = dt.strftime("%A, %b %d")
     slots = []
     for hour in [6, 12, 18]:
         varied = base.copy()
-        for idx in [0, 1, 2, 3, 4, 5]:  # pm10, pm2_5, co, no2, so2, ozone vary with time
+        for idx in [0, 1, 2, 3, 4, 5]:
             varied[idx] = base[idx] * HOUR_MULTIPLIERS[hour] * day_drift
         varied = np.clip(varied, 0, None)
-        p      = model.predict(varied.reshape(1,-1))[0]
-        cat    = encoder.inverse_transform([p])[0]
+        p   = model.predict(varied.reshape(1,-1))[0]
+        cat = encoder.inverse_transform([p])[0]
         slots.append({
-            "time": f"{hour:02d}:00",
-            "cat":  cat,
+            "time":  f"{hour:02d}:00",
+            "cat":   cat,
             "color": AQI_COLORS.get(cat, "#888"),
-            "pm25": f"{varied[1]:.1f} μg/m³",
         })
     forecast_data.append({"date": day_label, "slots": slots})
 
@@ -267,13 +266,11 @@ for i, day in enumerate(forecast_data):
         st.markdown(f"**{day['date']}**")
         for slot in day["slots"]:
             c = slot["color"]
-            text = "#000" if slot["cat"] in ["Good","Moderate"] else "#fff"
             st.markdown(
                 f'<div style="background:{c}22;border:1px solid {c}55;border-radius:8px;'
                 f'padding:10px 14px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;">'
                 f'<span style="font-family:DM Mono,monospace;font-size:0.8rem;color:#666;">{slot["time"]}</span>'
                 f'<span style="color:{c};font-weight:600;font-size:0.85rem;">{slot["cat"]}</span>'
-                f'<span style="font-family:DM Mono,monospace;font-size:0.75rem;color:#444;">{slot["pm25"]}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -311,7 +308,6 @@ if category in ALERT_CATEGORIES:
 else:
     st.success(f"No hazardous conditions detected. Current category: {category}.")
 
-all_cats = [s["cat"] for d in forecast_data for s in d["slots"]]
 hazardous_days = [d["date"] for d in forecast_data if any(s["cat"] in ALERT_CATEGORIES for s in d["slots"])]
 if hazardous_days:
     st.warning(f"Hazardous AQI levels forecasted on: {', '.join(hazardous_days)}")
