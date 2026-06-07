@@ -41,7 +41,7 @@ AQI-Predictor/
 │   └── processed/        # Processed features
 ├── models/               # Saved model artifacts
 ├── notebooks/
-    ├── notebook.ipynb    # Actual model training
+    ├── training.ipynb    # Actual model training
 │   └── EDA.ipynb         # Exploratory data analysis
 ├── app.py                # Streamlit dashboard
 ├── requirements.txt      # App dependencies
