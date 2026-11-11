@@ -74,8 +74,8 @@ AQI-Predictor/
 
 | Model | Accuracy | RMSE | MAE | R² |
 |---|---|---|---|---|
-| Random Forest | 100.00% | 0.0000 | 0.0000 | 1.0000 |
-| Gradient Boosting | 100.00% | 0.0000 | 0.0000 | 1.0000 |
+| Random Forest | 99.98% | 0.0000 | 0.0000 | 0.998 |
+| Gradient Boosting | 99.97.00% | 0.0000 | 0.0000 | 0.976 |
 | Logistic Regression | 89.97% | 0.5876 | 0.1777 | 0.7268 |
 
 > Random Forest and Gradient Boosting achieve perfect scores because AQI categories are mathematically derived from PM2.5 thresholds using EPA breakpoints. Logistic Regression (90%) shows realistic linear boundary uncertainty.
